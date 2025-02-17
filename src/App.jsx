@@ -6,7 +6,7 @@ export default function App() {
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
   const [error, setError] = useState('');
-  const [gridColor, setGridColor] = useState('#ff0000'); // 默认白色
+  const [gridColor, setGridColor] = useState('#ff0000'); // 默认红色
   const [gridOpacity, setGridOpacity] = useState(0.8); // 默认透明度
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -41,26 +41,18 @@ export default function App() {
   };
 
   const handleRowsChange = (e) => {
-    // 只允许数字输入
-    const value = e.target.value.replace(/[^\d]/g, '');
-    const newRows = parseInt(value) || 0;
-    if (validateGridSize(newRows, cols)) {
-      setRows(newRows);
-      if (selectedImage) {
-        drawImageWithGrid(selectedImage, newRows, cols);
-      }
+    const newRows = parseInt(e.target.value);
+    setRows(newRows);
+    if (selectedImage) {
+      drawImageWithGrid(selectedImage, newRows, cols);
     }
   };
 
   const handleColsChange = (e) => {
-    // 只允许数字输入
-    const value = e.target.value.replace(/[^\d]/g, '');
-    const newCols = parseInt(value) || 0;
-    if (validateGridSize(rows, newCols)) {
-      setCols(newCols);
-      if (selectedImage) {
-        drawImageWithGrid(selectedImage, rows, newCols);
-      }
+    const newCols = parseInt(e.target.value);
+    setCols(newCols);
+    if (selectedImage) {
+      drawImageWithGrid(selectedImage, rows, newCols);
     }
   };
 
@@ -160,34 +152,48 @@ export default function App() {
           <div className="space-y-6">
             <div className="space-y-4">
               <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    行数
+                <div className="flex-1 space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    行数: {rows}
                   </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                  <select
                     value={rows}
                     onChange={handleRowsChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md mb-2"
+                  >
+                    {Array.from({length: 100}, (_, i) => i + 1).map(num => (
+                      <option key={num} value={num}>{num}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="range"
                     min="1"
-                    max="20"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    max="100"
+                    value={rows}
+                    onChange={handleRowsChange}
+                    className="w-full"
                   />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    列数
+                <div className="flex-1 space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    列数: {cols}
                   </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                  <select
                     value={cols}
                     onChange={handleColsChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md mb-2"
+                  >
+                    {Array.from({length: 100}, (_, i) => i + 1).map(num => (
+                      <option key={num} value={num}>{num}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="range"
                     min="1"
-                    max="20"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    max="100"
+                    value={cols}
+                    onChange={handleColsChange}
+                    className="w-full"
                   />
                 </div>
               </div>
