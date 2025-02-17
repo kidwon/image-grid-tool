@@ -6,7 +6,7 @@ export default function App() {
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
   const [error, setError] = useState('');
-  const [gridColor, setGridColor] = useState('#ffffff'); // 默认白色
+  const [gridColor, setGridColor] = useState('#ff0000'); // 默认白色
   const [gridOpacity, setGridOpacity] = useState(0.8); // 默认透明度
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -32,8 +32,8 @@ export default function App() {
       setError('行数和列数必须大于0');
       return false;
     }
-    if (newRows > 20 || newCols > 20) {
-      setError('为了保持清晰度，行数和列数不能超过20');
+    if (newRows > 100 || newCols > 100) {
+      setError('为了保持清晰度，行数和列数不能超过100');
       return false;
     }
     setError('');
@@ -41,7 +41,9 @@ export default function App() {
   };
 
   const handleRowsChange = (e) => {
-    const newRows = parseInt(e.target.value) || 0;
+    // 只允许数字输入
+    const value = e.target.value.replace(/[^\d]/g, '');
+    const newRows = parseInt(value) || 0;
     if (validateGridSize(newRows, cols)) {
       setRows(newRows);
       if (selectedImage) {
@@ -51,7 +53,9 @@ export default function App() {
   };
 
   const handleColsChange = (e) => {
-    const newCols = parseInt(e.target.value) || 0;
+    // 只允许数字输入
+    const value = e.target.value.replace(/[^\d]/g, '');
+    const newCols = parseInt(value) || 0;
     if (validateGridSize(rows, newCols)) {
       setCols(newCols);
       if (selectedImage) {
@@ -161,7 +165,9 @@ export default function App() {
                     行数
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={rows}
                     onChange={handleRowsChange}
                     min="1"
@@ -174,7 +180,9 @@ export default function App() {
                     列数
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={cols}
                     onChange={handleColsChange}
                     min="1"
@@ -226,10 +234,10 @@ export default function App() {
                   九宫格 (3×3)
                 </button>
                 <button
-                  onClick={() => presetGrid(6, 4)}
+                  onClick={() => presetGrid(48, 33)}
                   className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
                 >
-                  24宫格 (6×4)
+                  大宫格 (48×33)
                 </button>
               </div>
             </div>
