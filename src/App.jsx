@@ -116,19 +116,63 @@ export default function App() {
 
   const downloadImage = () => {
     const canvas = canvasRef.current;
-    const imageData = canvas.toDataURL('image/png');
-    
-    // 检测是否是iOS设备
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
     if (isIOS) {
-      // iOS设备：打开图片在新窗口，用户可以长按保存
-      window.open(imageData);
+      // iOS设备：创建一个临时div来显示图片
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.top = '0';
+      wrapper.style.left = '0';
+      wrapper.style.right = '0';
+      wrapper.style.bottom = '0';
+      wrapper.style.backgroundColor = 'rgba(0,0,0,0.8)';
+      wrapper.style.zIndex = '9999';
+      wrapper.style.display = 'flex';
+      wrapper.style.alignItems = 'center';
+      wrapper.style.justifyContent = 'center';
+      wrapper.style.flexDirection = 'column';
+      
+      const img = document.createElement('img');
+      img.src = canvas.toDataURL('image/png');
+      img.style.maxWidth = '90%';
+      img.style.maxHeight = '80vh';
+      img.style.objectFit = 'contain';
+      
+      const text = document.createElement('p');
+      text.textContent = '长按图片保存';
+      text.style.color = 'white';
+      text.style.marginTop = '20px';
+      text.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '关闭';
+      closeBtn.style.marginTop = '10px';
+      closeBtn.style.padding = '8px 16px';
+      closeBtn.style.border = 'none';
+      closeBtn.style.borderRadius = '4px';
+      closeBtn.style.backgroundColor = 'white';
+      closeBtn.style.color = 'black';
+      
+      closeBtn.onclick = () => document.body.removeChild(wrapper);
+      
+      wrapper.appendChild(img);
+      wrapper.appendChild(text);
+      wrapper.appendChild(closeBtn);
+      
+      // 点击背景关闭
+      wrapper.onclick = (e) => {
+        if (e.target === wrapper) {
+          document.body.removeChild(wrapper);
+        }
+      };
+      
+      document.body.appendChild(wrapper);
     } else {
       // 其他设备：使用常规下载方式
       const link = document.createElement('a');
       link.download = `grid-${rows}x${cols}.png`;
-      link.href = imageData;
+      link.href = canvas.toDataURL('image/png');
       link.click();
     }
   };
