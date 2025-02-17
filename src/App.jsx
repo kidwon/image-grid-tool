@@ -7,7 +7,8 @@ export default function App() {
   const [cols, setCols] = useState(3);
   const [error, setError] = useState('');
   const [gridColor, setGridColor] = useState('#ff0000'); // 默认红色
-  const [gridOpacity, setGridOpacity] = useState(0.8); // 默认透明度
+  const [gridOpacity, setGridOpacity] = useState(0.8);
+  const [isSketch, setIsSketch] = useState(false); // 添加线稿状态
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -82,6 +83,81 @@ export default function App() {
     
     // Draw image
     ctx.drawImage(img, 0, 0);
+
+    // 如果未选中保持原图，则转换为线稿
+    if (!isSketch) {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      // 创建临时数组存储灰度值
+      const grayData = new Array(width * height);
+      
+      // 转换为灰度并存储
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        // 使用更精确的灰度转换公式
+        grayData[i/4] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+      }
+      
+      // 应用高斯模糊以减少噪点
+      const gaussianBlur = (x, y) => {
+        let sum = 0;
+        let count = 0;
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const px = x + i;
+            const py = y + j;
+            if (px >= 0 && px < width && py >= 0 && py < height) {
+              sum += grayData[py * width + px];
+              count++;
+            }
+          }
+        }
+        return Math.round(sum / count);
+      };
+      
+      // 应用Sobel算子检测边缘
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const idx = (y * width + x) * 4;
+          
+          // 计算周围像素的梯度
+          const gx = 
+            -1 * gaussianBlur(x-1, y-1) +
+            -2 * gaussianBlur(x-1, y) +
+            -1 * gaussianBlur(x-1, y+1) +
+            1 * gaussianBlur(x+1, y-1) +
+            2 * gaussianBlur(x+1, y) +
+            1 * gaussianBlur(x+1, y+1);
+            
+          const gy = 
+            -1 * gaussianBlur(x-1, y-1) +
+            -2 * gaussianBlur(x, y-1) +
+            -1 * gaussianBlur(x+1, y-1) +
+            1 * gaussianBlur(x-1, y+1) +
+            2 * gaussianBlur(x, y+1) +
+            1 * gaussianBlur(x+1, y+1);
+          
+          // 计算梯度强度
+          const grad = Math.sqrt(gx * gx + gy * gy);
+          
+          // 应用非线性变换增强对比度
+          const intensity = Math.min(255, Math.pow(grad / 4, 0.8));
+          
+          // 反转颜色，使线条为深色，背景为浅色
+          const value = 255 - intensity;
+          
+          // 设置像素值
+          data[idx] = data[idx + 1] = data[idx + 2] = value;
+        }
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+    }
     
     // Draw grid
     const rgba = hexToRgba(color, opacity);
@@ -268,6 +344,24 @@ export default function App() {
                     className="w-full"
                   />
                 </div>
+              </div>
+              
+              <div className="flex items-center">
+                <input 
+                  type="checkbox"
+                  id="sketch-mode"
+                  checked={isSketch}
+                  onChange={(e) => {
+                    setIsSketch(e.target.checked);
+                    if (selectedImage) {
+                      drawImageWithGrid(selectedImage);
+                    }
+                  }}
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                />
+                <label htmlFor="sketch-mode" className="ml-2 text-sm font-medium text-gray-700">
+                  保持原图（取消选中为线稿效果）
+                </label>
               </div>
 
               {error && (
