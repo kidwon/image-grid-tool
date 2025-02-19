@@ -5,12 +5,10 @@ export default function App() {
   // 状态定义
   const [images, setImages] = useState([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(-1);
-  const [error, setError] = useState('');
   const [gridColor, setGridColor] = useState('#ff0000');
   const [gridOpacity, setGridOpacity] = useState(0.8);
   const [isSketch, setIsSketch] = useState(false);
   const [sketchDarkness, setSketchDarkness] = useState(0.5);
-  const [scale, setScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
@@ -31,24 +29,39 @@ export default function App() {
           reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-              // 随机放置在画布上，避免完全重叠
-              const randomX = Math.random() * 200;
-              const randomY = Math.random() * 200;
+              // 获取画布尺寸
+              const canvas = canvasRef.current;
+              const GRID_SIZE = 32;
+              
+              // 根据网格计算初始位置（吸附到网格）
+              // 为了避免图片堆叠，计算一个基于当前图片数量的偏移
+              const offsetMultiplier = images.length % 10; // 每10张图片循环一次偏移
+              const offsetX = offsetMultiplier * GRID_SIZE;
+              const offsetY = Math.floor(images.length / 10) * GRID_SIZE;
+              
+              // 确保图片在画布范围内
+              const initialScale = 0.5; // 初始缩放比例
+              const scaledWidth = img.width * initialScale;
+              const scaledHeight = img.height * initialScale;
+              
+              // 将位置吸附到网格
+              const x = Math.min(offsetX, canvas ? canvas.width - scaledWidth : 1000);
+              const y = Math.min(offsetY, canvas ? canvas.height - scaledHeight : 1000);
               
               newImages.push({
                 img: img,
                 name: file.name,
-                scale: 0.5, // 初始缩放比例小一些，更容易管理多图
-                x: randomX,
-                y: randomY,
+                scale: initialScale,
+                x: Math.round(x / GRID_SIZE) * GRID_SIZE, // 吸附到网格
+                y: Math.round(y / GRID_SIZE) * GRID_SIZE, // 吸附到网格
                 width: img.width,
-                height: img.height,
-                visible: true
+                height: img.height
               });
               
               loadedCount++;
               if (loadedCount === Array.from(files).filter(f => f.type.startsWith('image/')).length) {
-                setImages(prevImages => [...prevImages, ...newImages]);
+                // 将新图片添加到顶层（数组前面）
+                setImages(prevImages => [...newImages, ...prevImages]);
                 drawCanvas();
               }
             };
@@ -76,10 +89,8 @@ export default function App() {
     // 清除画布
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 绘制所有可见的图片
+    // 绘制所有图片
     images.forEach((image, index) => {
-      if (!image.visible) return;
-      
       const img = image.img;
       const scaledWidth = img.width * image.scale;
       const scaledHeight = img.height * image.scale;
@@ -184,11 +195,12 @@ export default function App() {
     ctx.strokeStyle = rgba;
     ctx.lineWidth = 2;
     
-    // 使用固定大小的网格 (32x32)
+    // 使用固定大小的网格 (32x32) - 注意：如果修改这个值，也需要修改handleMouseMove中的GRID_SIZE
     const GRID_SIZE = 32;
     
+    // 从0开始绘制网格，确保左上角也有网格线
     // 绘制垂直线
-    for (let x = GRID_SIZE; x < width; x += GRID_SIZE) {
+    for (let x = 0; x <= width; x += GRID_SIZE) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
@@ -196,7 +208,7 @@ export default function App() {
     }
     
     // 绘制水平线
-    for (let y = GRID_SIZE; y < height; y += GRID_SIZE) {
+    for (let y = 0; y <= height; y += GRID_SIZE) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
@@ -225,10 +237,9 @@ export default function App() {
 
   // 检查点击位置是否在图片上
   const getImageAtPosition = (x, y) => {
-    // 逆序检查，因为后添加的图片在上层
-    for (let i = images.length - 1; i >= 0; i--) {
+    // 从前往后检查，因为前面的图片在上层
+    for (let i = 0; i < images.length; i++) {
       const image = images[i];
-      if (!image.visible) continue;
       
       const scaledWidth = image.img.width * image.scale;
       const scaledHeight = image.img.height * image.scale;
@@ -286,11 +297,24 @@ export default function App() {
     
     setImages(prevImages => {
       const newImages = [...prevImages];
+      const currentImage = newImages[selectedImageIndex];
+      const scaledWidth = currentImage.img.width * currentImage.scale;
+      const scaledHeight = currentImage.img.height * currentImage.scale;
+      
+      // 计算新位置
+      let newX = currentImage.x + dx;
+      let newY = currentImage.y + dy;
+      
+      // 限制图片不要超出画布边界
+      newX = Math.max(0, Math.min(canvas.width - scaledWidth, newX));
+      newY = Math.max(0, Math.min(canvas.height - scaledHeight, newY));
+      
       newImages[selectedImageIndex] = {
-        ...newImages[selectedImageIndex],
-        x: newImages[selectedImageIndex].x + dx,
-        y: newImages[selectedImageIndex].y + dy
+        ...currentImage,
+        x: newX,
+        y: newY
       };
+      
       return newImages;
     });
     
@@ -299,6 +323,32 @@ export default function App() {
   };
 
   const handleMouseUp = () => {
+    // 停止拖动时进行网格吸附
+    if (isDragging && selectedImageIndex !== -1) {
+      setImages(prevImages => {
+        const newImages = [...prevImages];
+        const currentImage = newImages[selectedImageIndex];
+        
+        // 网格吸附逻辑
+        const GRID_SIZE = 32;
+        
+        // 吸附到网格左上角
+        const snappedX = Math.round(currentImage.x / GRID_SIZE) * GRID_SIZE;
+        const snappedY = Math.round(currentImage.y / GRID_SIZE) * GRID_SIZE;
+        
+        newImages[selectedImageIndex] = {
+          ...currentImage,
+          x: snappedX,
+          y: snappedY
+        };
+        
+        return newImages;
+      });
+      
+      // 重绘画布以显示吸附后的位置
+      drawCanvas();
+    }
+    
     setIsDragging(false);
   };
 
@@ -341,20 +391,6 @@ export default function App() {
     drawCanvas();
   };
 
-  // 移除图片
-  const removeSelectedImage = () => {
-    if (selectedImageIndex === -1) return;
-    
-    setImages(prevImages => {
-      const newImages = [...prevImages];
-      newImages[selectedImageIndex].visible = false;
-      return newImages;
-    });
-    
-    setSelectedImageIndex(-1);
-    drawCanvas();
-  };
-
   // 删除图片
   const deleteSelectedImage = () => {
     if (selectedImageIndex === -1) return;
@@ -369,15 +405,31 @@ export default function App() {
     drawCanvas();
   };
 
-  // 重新显示图片
-  const showImage = (index) => {
+  // 将选中的图片移到顶层
+  const bringToFront = () => {
+    if (selectedImageIndex === -1 || selectedImageIndex === 0) return;
+    
     setImages(prevImages => {
       const newImages = [...prevImages];
-      newImages[index].visible = true;
-      return newImages;
+      const selected = newImages.splice(selectedImageIndex, 1)[0];
+      return [selected, ...newImages];
     });
     
-    setSelectedImageIndex(index);
+    setSelectedImageIndex(0);
+    drawCanvas();
+  };
+
+  // 将选中的图片移到底层
+  const sendToBack = () => {
+    if (selectedImageIndex === -1 || selectedImageIndex === images.length - 1) return;
+    
+    setImages(prevImages => {
+      const newImages = [...prevImages];
+      const selected = newImages.splice(selectedImageIndex, 1)[0];
+      return [...newImages, selected];
+    });
+    
+    setSelectedImageIndex(images.length - 1);
     drawCanvas();
   };
 
@@ -480,7 +532,7 @@ export default function App() {
           <h1 className="text-2xl font-bold mb-6 text-center">图片网格工具</h1>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 左侧：图片列表和上传 */}
+            {/* 左侧：工具控制面板 */}
             <div className="lg:col-span-1 space-y-4">
               <button
                 onClick={() => fileInputRef.current.click()}
@@ -496,96 +548,6 @@ export default function App() {
                 multiple
                 className="hidden"
               />
-              
-              <div className="space-y-4">
-                <div className="border p-2 rounded-md h-60 overflow-y-auto">
-                  <h3 className="font-medium mb-2">可见图片:</h3>
-                  {images.filter(img => img.visible).length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">暂无可见图片</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {images.map((image, index) => {
-                        if (!image.visible) return null;
-                        return (
-                          <li 
-                            key={index}
-                            className={`px-3 py-2 cursor-pointer rounded flex items-center justify-between ${selectedImageIndex === index ? 'bg-blue-100 border border-blue-300' : 'hover:bg-gray-100'}`}
-                            onClick={() => setSelectedImageIndex(index)}
-                          >
-                            <div className="flex items-center flex-1 min-w-0">
-                              <div className="w-8 h-8 bg-gray-200 flex-shrink-0 mr-2 overflow-hidden">
-                                <img 
-                                  src={image.img.src} 
-                                  alt={`缩略图 ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <span className="truncate">{image.name || `图片 ${index + 1}`}</span>
-                            </div>
-                            <button 
-                              className="ml-2 text-red-500 hover:text-red-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedImageIndex(index);
-                                removeSelectedImage();
-                              }}
-                            >
-                              移除
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-                
-                <div className="border p-2 rounded-md h-60 overflow-y-auto">
-                  <h3 className="font-medium mb-2">隐藏图片:</h3>
-                  {images.filter(img => !img.visible).length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">暂无隐藏图片</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {images.map((image, index) => {
-                        if (image.visible) return null;
-                        return (
-                          <li 
-                            key={index}
-                            className="px-3 py-2 cursor-pointer rounded flex items-center justify-between hover:bg-gray-100"
-                          >
-                            <div className="flex items-center flex-1 min-w-0">
-                              <div className="w-8 h-8 bg-gray-200 flex-shrink-0 mr-2 overflow-hidden opacity-50">
-                                <img 
-                                  src={image.img.src} 
-                                  alt={`缩略图 ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <span className="truncate text-gray-500">{image.name || `图片 ${index + 1}`}</span>
-                            </div>
-                            <div className="flex space-x-2">
-                              <button 
-                                className="text-green-500 hover:text-green-700"
-                                onClick={() => showImage(index)}
-                              >
-                                显示
-                              </button>
-                              <button 
-                                className="text-red-500 hover:text-red-700"
-                                onClick={() => {
-                                  setSelectedImageIndex(index);
-                                  deleteSelectedImage();
-                                }}
-                              >
-                                删除
-                              </button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </div>
               
               {/* 图片控制 */}
               {selectedImageIndex !== -1 && (
@@ -607,40 +569,34 @@ export default function App() {
                     />
                   </div>
                   
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={bringToFront}
+                      className="bg-blue-500 text-white px-2 py-1 rounded-md hover:bg-blue-600"
+                    >
+                      移至顶层
+                    </button>
+                    <button
+                      onClick={sendToBack}
+                      className="bg-blue-500 text-white px-2 py-1 rounded-md hover:bg-blue-600"
+                    >
+                      移至底层
+                    </button>
+                  </div>
+                  
                   <button
-                    onClick={removeSelectedImage}
+                    onClick={deleteSelectedImage}
                     className="w-full bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600"
                   >
-                    从画布移除
+                    删除图片
                   </button>
                 </div>
               )}
-            </div>
-            
-            {/* 中间：画布区域 */}
-            <div className="lg:col-span-2 space-y-4">
-              <div 
-                ref={canvasContainerRef}
-                className="overflow-hidden bg-gray-50 flex justify-center relative"
-              >
-                <canvas
-                  ref={canvasRef}
-                  className="max-w-full h-auto cursor-move"
-                  style={{
-                    aspectRatio: '1051/1500',
-                    maxHeight: '70vh',
-                    objectFit: 'contain'
-                  }}
-                />
-                {selectedImageIndex !== -1 && (
-                  <div className="absolute top-2 left-2 bg-white bg-opacity-80 rounded px-2 py-1 text-sm">
-                    已选择: {images[selectedImageIndex].name || `图片 ${selectedImageIndex + 1}`}
-                  </div>
-                )}
-              </div>
               
               {/* 网格控制 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4 border p-4 rounded-md">
+                <h3 className="font-medium">网格设置:</h3>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     网格颜色
@@ -670,7 +626,9 @@ export default function App() {
               </div>
               
               {/* 线稿控制 */}
-              <div className="space-y-4">
+              <div className="space-y-4 border p-4 rounded-md">
+                <h3 className="font-medium">线稿效果:</h3>
+                
                 <div className="flex items-center">
                   <input 
                     type="checkbox"
@@ -718,6 +676,68 @@ export default function App() {
                 <p className="text-sm text-gray-600 text-center">
                   iOS设备请在新窗口打开后，长按图片选择"存储图像"
                 </p>
+              )}
+            </div>
+            
+            {/* 右侧：画布区域 */}
+            <div className="lg:col-span-2 space-y-4">
+              <div 
+                ref={canvasContainerRef}
+                className="overflow-hidden bg-gray-50 flex justify-center relative border rounded-md"
+              >
+                <canvas
+                  ref={canvasRef}
+                  className="max-w-full h-auto cursor-move"
+                  style={{
+                    aspectRatio: '1051/1500',
+                    maxHeight: '70vh',
+                    objectFit: 'contain'
+                  }}
+                />
+                {selectedImageIndex !== -1 && (
+                  <div className="absolute top-2 left-2 bg-white bg-opacity-80 rounded px-2 py-1 text-sm">
+                    已选择: {images[selectedImageIndex].name || `图片 ${selectedImageIndex + 1}`}
+                  </div>
+                )}
+                {images.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <p>点击"选择图片"按钮上传图片</p>
+                      <p className="text-sm mt-2">支持拖拽位置和调整大小</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {images.length > 0 && (
+                <div className="border rounded-md p-4 bg-gray-50">
+                  <h3 className="font-medium mb-2">图片列表 ({images.length}张):</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {images.map((image, index) => (
+                      <div 
+                        key={index}
+                        className={cn(
+                          "cursor-pointer rounded-md p-1 overflow-hidden border",
+                          selectedImageIndex === index 
+                            ? "border-blue-500 bg-blue-50" 
+                            : "border-gray-200 hover:bg-gray-100"
+                        )}
+                        onClick={() => setSelectedImageIndex(index)}
+                      >
+                        <div className="relative pb-[75%]">
+                          <img 
+                            src={image.img.src} 
+                            alt={`图片 ${index + 1}`}
+                            className="absolute inset-0 w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="mt-1 truncate text-xs text-center">
+                          {image.name || `图片 ${index + 1}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
