@@ -723,57 +723,57 @@ export default function App() {
         );
 
         // 仅当有明显变化时才处理，避免抖动
-        if (Math.abs(distance - lastPinchDistance) > 5) {
-          // 计算缩放比例
-          const scaleFactor = distance / lastPinchDistance;
-          let newScale = initialScale * scaleFactor;
+        // if (Math.abs(distance - lastPinchDistance) > 1) {
+        // 计算缩放比例
+        const scaleFactor = distance / lastPinchDistance;
+        let newScale = initialScale * scaleFactor;
 
-          // 限制缩放范围
-          newScale = Math.max(0.1, Math.min(newScale, 5));
+        // 限制缩放范围
+        newScale = Math.max(0.1, Math.min(newScale, 5));
 
-          // 计算触摸中心点 - 转换为画布坐标系
-          const centerClientX = (touch1.clientX + touch2.clientX) / 2;
-          const centerClientY = (touch1.clientY + touch2.clientY) / 2;
+        // 计算触摸中心点 - 转换为画布坐标系
+        const centerClientX = (touch1.clientX + touch2.clientX) / 2;
+        const centerClientY = (touch1.clientY + touch2.clientY) / 2;
 
-          // 转换为画布坐标系
-          const centerCanvasX = (centerClientX - rect.left) * scaleX;
-          const centerCanvasY = (centerClientY - rect.top) * scaleY;
+        // 转换为画布坐标系
+        const centerCanvasX = (centerClientX - rect.left) * scaleX;
+        const centerCanvasY = (centerClientY - rect.top) * scaleY;
 
-          // 计算当前图片中心点
-          const imgCenterX = image.x + (image.img.width * image.scale) / 2;
-          const imgCenterY = image.y + (image.img.height * image.scale) / 2;
+        // 计算当前图片中心点
+        const imgCenterX = image.x + (image.img.width * image.scale) / 2;
+        const imgCenterY = image.y + (image.img.height * image.scale) / 2;
 
-          // 计算缩放后的新尺寸
-          const newWidth = image.img.width * newScale;
-          const newHeight = image.img.height * newScale;
+        // 计算缩放后的新尺寸
+        const newWidth = image.img.width * newScale;
+        const newHeight = image.img.height * newScale;
 
-          // 计算新的左上角位置，保持缩放中心点不变
-          let newX = imgCenterX - newWidth / 2;
-          let newY = imgCenterY - newHeight / 2;
+        // 计算新的左上角位置，保持缩放中心点不变
+        let newX = imgCenterX - newWidth / 2;
+        let newY = imgCenterY - newHeight / 2;
 
-          // // 对齐到网格
-          // newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-          // newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+        // // 对齐到网格
+        // newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+        // newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
 
-          // 确保不超出画布边界
-          newX = Math.max(0, Math.min(canvas.width - newWidth, newX));
-          newY = Math.max(0, Math.min(canvas.height - newHeight, newY));
+        // 确保不超出画布边界
+        newX = Math.max(0, Math.min(canvas.width - newWidth, newX));
+        newY = Math.max(0, Math.min(canvas.height - newHeight, newY));
 
-          // 更新图片
-          setImages(prevImages => {
-            const newImages = [...prevImages];
-            newImages[selectedImageIndex] = {
-              ...newImages[selectedImageIndex],
-              scale: newScale,
-              x: newX,
-              y: newY
-            };
-            return newImages;
-          });
+        // 更新图片
+        setImages(prevImages => {
+          const newImages = [...prevImages];
+          newImages[selectedImageIndex] = {
+            ...newImages[selectedImageIndex],
+            scale: newScale,
+            x: newX,
+            y: newY
+          };
+          return newImages;
+        });
 
-          setLastPinchDistance(distance);
-          drawCanvas();
-        }
+        setLastPinchDistance(distance);
+        drawCanvas();
+        // }
       }
     }
     // 如果不是在操作画布，不阻止默认行为，允许页面滚动
@@ -1083,8 +1083,8 @@ export default function App() {
                   onClick={bringToFront}
                   disabled={selectedImageIndex === -1 || selectedImageIndex === 0}
                   className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1 && selectedImageIndex !== 0
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }`}
                 >
                   移至顶层
@@ -1094,8 +1094,8 @@ export default function App() {
                   onClick={sendToBack}
                   disabled={selectedImageIndex === -1 || selectedImageIndex === images.length - 1}
                   className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1 && selectedImageIndex !== images.length - 1
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }`}
                 >
                   移至底层
@@ -1105,8 +1105,8 @@ export default function App() {
                   onClick={generateSketch}
                   disabled={selectedImageIndex === -1}
                   className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1
-                      ? "bg-green-500 text-white hover:bg-green-600"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    ? "bg-green-500 text-white hover:bg-green-600"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }`}
                 >
                   生成线稿副本
@@ -1116,8 +1116,8 @@ export default function App() {
                   onClick={deleteSelectedImage}
                   disabled={selectedImageIndex === -1}
                   className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1
-                      ? "bg-red-500 text-white hover:bg-red-600"
-                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }`}
                 >
                   删除图片
