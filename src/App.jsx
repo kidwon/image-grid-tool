@@ -635,6 +635,7 @@ export default function App() {
   };
 
   // 触摸事件处理
+  // 修改handleTouchStart，避免重复设置初始值
   const handleTouchStart = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -644,13 +645,8 @@ export default function App() {
     const touchX = touch.clientX;
     const touchY = touch.clientY;
 
-    // 如果触摸点在画布区域内，才阻止默认行为
-    if (
-      touchX >= rect.left &&
-      touchX <= rect.right &&
-      touchY >= rect.top &&
-      touchY <= rect.bottom
-    ) {
+    if (touchX >= rect.left && touchX <= rect.right &&
+      touchY >= rect.top && touchY <= rect.bottom) {
       e.preventDefault();
 
       if (e.touches.length === 1) {
@@ -665,28 +661,18 @@ export default function App() {
         setIsDragging(false);
         setResizeMode('none');
 
-        // 计算两指之间的距离
+        // 计算两指之间的距离并存储作为初始距离
         const touch1 = e.touches[0];
         const touch2 = e.touches[1];
         const distance = Math.hypot(
           touch2.clientX - touch1.clientX,
           touch2.clientY - touch1.clientY
         );
-
         setLastPinchDistance(distance);
 
-        // 保存初始缩放和尺寸
-        const image = images[selectedImageIndex];
-        setInitialScale(image.scale);
-        setInitialDimensions({
-          width: image.img.width * image.scale,
-          height: image.img.height * image.scale,
-          x: image.x,
-          y: image.y
-        });
+        // 不再设置initialScale，改为使用当前scale作为基准
       }
     }
-    // 如果不在画布区域内，不阻止默认行为，允许页面滚动
   };
 
   // 修改后的触摸移动处理函数 - 独立的缩放逻辑
@@ -699,72 +685,65 @@ export default function App() {
       e.preventDefault();
 
       if (e.touches.length === 1 && !isPinching) {
-        // 单指移动 - 使用handleMouseMove
+        // 单指移动
         const touch = e.touches[0];
         handleMouseMove({
           clientX: touch.clientX,
           clientY: touch.clientY
         });
       } else if (e.touches.length === 2 && isPinching && selectedImageIndex !== -1) {
-        // 双指缩放 - 完全独立的逻辑，不使用handleMouseMove
+        // 双指缩放处理
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
 
         const image = images[selectedImageIndex];
-        const GRID_SIZE = 32;
 
         // 计算新的两指距离
         const touch1 = e.touches[0];
         const touch2 = e.touches[1];
         const distance = Math.hypot(
           touch2.clientX - touch1.clientX,
-          touch2.clientY - touch1.clientY
+          touch2.clientY - touch2.clientY
         );
 
-        // 计算缩放比例 - 移除最小变化阈值检测，实现更平滑的缩放
+        // 只计算相对变化，避免累积误差
         const scaleFactor = distance / lastPinchDistance;
-        let newScale = initialScale * scaleFactor;
+
+        // 应用缩放，注意这里使用当前scale作为基准，而不是initialScale
+        // 这样可以避免"弹簧"效果
+        let newScale = image.scale * scaleFactor;
 
         // 限制缩放范围
         newScale = Math.max(0.1, Math.min(newScale, 5));
 
-        // 计算触摸中心点 - 转换为画布坐标系
-        const centerClientX = (touch1.clientX + touch2.clientX) / 2;
-        const centerClientY = (touch1.clientY + touch2.clientY) / 2;
+        // 计算图片中心点
+        const scaledWidth = image.img.width * image.scale;
+        const scaledHeight = image.img.height * image.scale;
+        const imgCenterX = image.x + scaledWidth / 2;
+        const imgCenterY = image.y + scaledHeight / 2;
 
-        // 转换为画布坐标系
-        const centerCanvasX = (centerClientX - rect.left) * scaleX;
-        const centerCanvasY = (centerClientY - rect.top) * scaleY;
-
-        // 计算当前图片中心点
-        const imgCenterX = image.x + (image.img.width * image.scale) / 2;
-        const imgCenterY = image.y + (image.img.height * image.scale) / 2;
-
-        // 计算缩放后的新尺寸
+        // 计算新尺寸
         const newWidth = image.img.width * newScale;
         const newHeight = image.img.height * newScale;
 
-        // 计算新的左上角位置，保持缩放中心点不变
+        // 保持中心点不变计算新位置
         let newX = imgCenterX - newWidth / 2;
         let newY = imgCenterY - newHeight / 2;
 
-        // 临时存储原始位置，不立即对齐网格
-        const tempX = newX;
-        const tempY = newY;
-
-        // 更新图片 - 在渲染时对网格进行对齐，而不是在计算时
+        // 更新图片
         setImages(prevImages => {
           const newImages = [...prevImages];
           newImages[selectedImageIndex] = {
             ...newImages[selectedImageIndex],
             scale: newScale,
-            x: tempX, // 使用未对齐的位置，保持平滑缩放
-            y: tempY  // 缩放结束后再对齐到网格
+            x: newX,
+            y: newY
           };
           return newImages;
         });
 
+        // 非常重要：更新lastPinchDistance以便下次计算
         setLastPinchDistance(distance);
         drawCanvas();
       }
@@ -804,9 +783,9 @@ export default function App() {
     //     });
     //   }
 
-      setIsPinching(false);
-      setIsDragging(false);
-      setResizeMode('none');
+    setIsPinching(false);
+    setIsDragging(false);
+    setResizeMode('none');
     // } else if (e.touches.length === 1 && isPinching) {
     //   // 从双指到单指，重新设置拖动起点
     //   setIsPinching(false);
