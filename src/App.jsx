@@ -634,119 +634,145 @@ export default function App() {
     setResizeMode('none');
   };
 
-  // 触摸事件处理
+  // 修改touchStart函数，只在需要时阻止默认行为
   const handleTouchStart = (e) => {
-    e.preventDefault();
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
 
-    if (e.touches.length === 1) {
-      // 单指触摸 - 处理拖动或调整大小
-      const touch = e.touches[0];
-      handleMouseDown({
-        clientX: touch.clientX,
-        clientY: touch.clientY
-      });
-    } else if (e.touches.length === 2 && selectedImageIndex !== -1) {
-      // 双指触摸 - 处理缩放
-      setIsPinching(true);
-      setIsDragging(false);
-      setResizeMode('none');
+    // 检查触摸是否在画布区域内
+    const touch = e.touches[0];
+    const touchX = touch.clientX;
+    const touchY = touch.clientY;
 
-      // 计算两指之间的距离
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const distance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
+    // 如果触摸点在画布区域内，才阻止默认行为
+    if (
+      touchX >= rect.left &&
+      touchX <= rect.right &&
+      touchY >= rect.top &&
+      touchY <= rect.bottom
+    ) {
+      e.preventDefault();
 
-      setLastPinchDistance(distance);
+      if (e.touches.length === 1) {
+        // 单指触摸 - 处理拖动或调整大小
+        handleMouseDown({
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+      } else if (e.touches.length === 2 && selectedImageIndex !== -1) {
+        // 双指触摸 - 处理缩放
+        setIsPinching(true);
+        setIsDragging(false);
+        setResizeMode('none');
 
-      // 保存初始缩放和尺寸
-      const image = images[selectedImageIndex];
-      setInitialScale(image.scale);
-      setInitialDimensions({
-        width: image.img.width * image.scale,
-        height: image.img.height * image.scale,
-        x: image.x,
-        y: image.y
-      });
+        // 计算两指之间的距离
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.hypot(
+          touch2.clientX - touch1.clientX,
+          touch2.clientY - touch1.clientY
+        );
+
+        setLastPinchDistance(distance);
+
+        // 保存初始缩放和尺寸
+        const image = images[selectedImageIndex];
+        setInitialScale(image.scale);
+        setInitialDimensions({
+          width: image.img.width * image.scale,
+          height: image.img.height * image.scale,
+          x: image.x,
+          y: image.y
+        });
+      }
     }
+    // 如果不在画布区域内，不阻止默认行为，允许页面滚动
   };
 
+  // 修改touchMove函数，只在需要时阻止默认行为
   const handleTouchMove = (e) => {
-    e.preventDefault();
+    const canvas = canvasRef.current;
 
-    if (e.touches.length === 1 && !isPinching) {
-      // 单指移动
-      const touch = e.touches[0];
-      handleMouseMove({
-        clientX: touch.clientX,
-        clientY: touch.clientY
-      });
-    } else if (e.touches.length === 2 && isPinching && selectedImageIndex !== -1) {
-      // 双指缩放
-      if (!canvasRef.current) return;
-      const canvas = canvasRef.current;
-      const image = images[selectedImageIndex];
-      const GRID_SIZE = 32;
+    // 只有在拖动、调整大小或捏合缩放时才阻止默认行为
+    if (isDragging || resizeMode !== 'none' || isPinching) {
+      e.preventDefault();
 
-      // 计算新的两指距离
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const distance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
+      if (e.touches.length === 1 && !isPinching) {
+        // 单指移动
+        const touch = e.touches[0];
+        handleMouseMove({
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+      } else if (e.touches.length === 2 && isPinching && selectedImageIndex !== -1) {
+        // 双指缩放
+        if (!canvasRef.current) return;
+        const canvas = canvasRef.current;
+        const image = images[selectedImageIndex];
+        const GRID_SIZE = 32;
 
-      // 计算缩放比例
-      const scaleFactor = distance / lastPinchDistance;
-      let newScale = initialScale * scaleFactor;
+        // 计算新的两指距离
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.hypot(
+          touch2.clientX - touch1.clientX,
+          touch2.clientY - touch1.clientY
+        );
 
-      // 限制缩放范围
-      newScale = Math.max(0.1, Math.min(newScale, 5));
+        // 计算缩放比例
+        const scaleFactor = distance / lastPinchDistance;
+        let newScale = initialScale * scaleFactor;
 
-      // 计算新中心点
-      const centerX = (touch1.clientX + touch2.clientX) / 2;
-      const centerY = (touch1.clientY + touch2.clientY) / 2;
+        // 限制缩放范围
+        newScale = Math.max(0.1, Math.min(newScale, 5));
 
-      // 计算缩放前后的尺寸差
-      const oldWidth = image.img.width * image.scale;
-      const oldHeight = image.img.height * image.scale;
-      const newWidth = image.img.width * newScale;
-      const newHeight = image.img.height * newScale;
-      const widthDiff = newWidth - oldWidth;
-      const heightDiff = newHeight - oldHeight;
+        // 计算新中心点
+        const centerX = (touch1.clientX + touch2.clientX) / 2;
+        const centerY = (touch1.clientY + touch2.clientY) / 2;
 
-      // 更新位置，保持中心点不变
-      let newX = image.x - widthDiff / 2;
-      let newY = image.y - heightDiff / 2;
+        // 计算缩放前后的尺寸差
+        const oldWidth = image.img.width * image.scale;
+        const oldHeight = image.img.height * image.scale;
+        const newWidth = image.img.width * newScale;
+        const newHeight = image.img.height * newScale;
+        const widthDiff = newWidth - oldWidth;
+        const heightDiff = newHeight - oldHeight;
 
-      // 对齐到网格
-      newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-      newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+        // 更新位置，保持中心点不变
+        let newX = image.x - widthDiff / 2;
+        let newY = image.y - heightDiff / 2;
 
-      // 确保不超出画布边界
-      newX = Math.max(0, Math.min(canvas.width - newWidth, newX));
-      newY = Math.max(0, Math.min(canvas.height - newHeight, newY));
+        // 对齐到网格
+        newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+        newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
 
-      // 更新图片
-      setImages(prevImages => {
-        const newImages = [...prevImages];
-        newImages[selectedImageIndex] = {
-          ...newImages[selectedImageIndex],
-          scale: newScale,
-          x: newX,
-          y: newY
-        };
-        return newImages;
-      });
+        // 确保不超出画布边界
+        newX = Math.max(0, Math.min(canvas.width - newWidth, newX));
+        newY = Math.max(0, Math.min(canvas.height - newHeight, newY));
 
-      setLastPinchDistance(distance);
-      drawCanvas();
+        // 更新图片
+        setImages(prevImages => {
+          const newImages = [...prevImages];
+          newImages[selectedImageIndex] = {
+            ...newImages[selectedImageIndex],
+            scale: newScale,
+            x: newX,
+            y: newY
+          };
+          return newImages;
+        });
+
+        setLastPinchDistance(distance);
+        drawCanvas();
+      }
     }
+    // 如果不是在操作画布，不阻止默认行为，允许页面滚动
   };
 
   const handleTouchEnd = (e) => {
+    // 不需要在这里调用 preventDefault
+    // 因为触摸结束时我们希望恢复正常的滚动行为
+    
     if (e.touches.length === 0) {
       // 所有手指都离开了屏幕
       setIsPinching(false);
@@ -757,16 +783,43 @@ export default function App() {
       setIsPinching(false);
       const touch = e.touches[0];
       const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-
-      setDragStart({
-        x: (touch.clientX - rect.left) * scaleX,
-        y: (touch.clientY - rect.top) * scaleY
-      });
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+  
+        setDragStart({
+          x: (touch.clientX - rect.left) * scaleX,
+          y: (touch.clientY - rect.top) * scaleY
+        });
+      }
     }
   };
+
+  // 修改useEffect中的事件监听绑定
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('mousedown', handleMouseDown);
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+
+      // 修改事件监听方式，使用正确的passive设置
+      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
+
+      return () => {
+        canvas.removeEventListener('mousedown', handleMouseDown);
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [selectedImageIndex, isDragging, dragStart, images, resizeMode, isPinching, lastPinchDistance, initialScale, initialDimensions]);
 
   // 图片缩放功能
   const handleScaleChange = (e) => {
