@@ -751,9 +751,9 @@ export default function App() {
           let newX = imgCenterX - newWidth / 2;
           let newY = imgCenterY - newHeight / 2;
 
-          // 对齐到网格
-          newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-          newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+          // // 对齐到网格
+          // newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+          // newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
 
           // 确保不超出画布边界
           newX = Math.max(0, Math.min(canvas.width - newWidth, newX));
