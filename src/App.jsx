@@ -751,57 +751,9 @@ export default function App() {
   };
 
   const handleTouchEnd = (e) => {
-    // if (e.touches.length === 0) {
-    //   // 所有手指都离开了屏幕
-    //   if (isPinching && selectedImageIndex !== -1) {
-    //     // 缩放结束后对齐到网格
-    //     const GRID_SIZE = 32;
-    //     const canvas = canvasRef.current;
-
-    //     setImages(prevImages => {
-    //       const newImages = [...prevImages];
-    //       const image = newImages[selectedImageIndex];
-
-    //       // 对齐到网格
-    //       let alignedX = Math.round(image.x / GRID_SIZE) * GRID_SIZE;
-    //       let alignedY = Math.round(image.y / GRID_SIZE) * GRID_SIZE;
-
-    //       // 确保不超出画布边界
-    //       if (canvas) {
-    //         const scaledWidth = image.img.width * image.scale;
-    //         const scaledHeight = image.img.height * image.scale;
-    //         alignedX = Math.max(0, Math.min(canvas.width - scaledWidth, alignedX));
-    //         alignedY = Math.max(0, Math.min(canvas.height - scaledHeight, alignedY));
-    //       }
-
-    //       newImages[selectedImageIndex] = {
-    //         ...image,
-    //         x: alignedX,
-    //         y: alignedY
-    //       };
-    //       return newImages;
-    //     });
-    //   }
-
     setIsPinching(false);
     setIsDragging(false);
     setResizeMode('none');
-    // } else if (e.touches.length === 1 && isPinching) {
-    //   // 从双指到单指，重新设置拖动起点
-    //   setIsPinching(false);
-    //   const touch = e.touches[0];
-    //   const canvas = canvasRef.current;
-    //   if (canvas) {
-    //     const rect = canvas.getBoundingClientRect();
-    //     const scaleX = canvas.width / rect.width;
-    //     const scaleY = canvas.height / rect.height;
-
-    //     setDragStart({
-    //       x: (touch.clientX - rect.left) * scaleX,
-    //       y: (touch.clientY - rect.top) * scaleY
-    //     });
-    //   }
-    // }
   };
 
   // 图片缩放功能
