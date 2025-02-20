@@ -15,6 +15,9 @@ export default function App() {
   const [isPinching, setIsPinching] = useState(false);
   const [lastPinchDistance, setLastPinchDistance] = useState(0);
 
+  // 新增UI控制状态
+  const [showGridSettings, setShowGridSettings] = useState(false);
+
   // refs
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -163,7 +166,6 @@ export default function App() {
     }
   }, [images, selectedImageIndex]);
 
-
   const handleImageUpload = (event) => {
     const files = event.target.files;
     if (files.length > 0) {
@@ -276,8 +278,6 @@ export default function App() {
     // 绘制网格
     drawGrid(ctx, canvas.width, canvas.height, gridColor, gridOpacity);
   };
-
-
 
   // 将网格绘制提取为独立函数
   const drawGrid = (ctx, width, height, color, opacity) => {
@@ -634,7 +634,7 @@ export default function App() {
     setResizeMode('none');
   };
 
-  // 修改touchStart函数，只在需要时阻止默认行为
+  // 触摸事件处理
   const handleTouchStart = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -689,9 +689,10 @@ export default function App() {
     // 如果不在画布区域内，不阻止默认行为，允许页面滚动
   };
 
-  // 修改touchMove函数，只在需要时阻止默认行为
+  // 修改后的触摸移动处理函数 - 修复iOS缩放问题
   const handleTouchMove = (e) => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
 
     // 只有在拖动、调整大小或捏合缩放时才阻止默认行为
     if (isDragging || resizeMode !== 'none' || isPinching) {
@@ -705,9 +706,11 @@ export default function App() {
           clientY: touch.clientY
         });
       } else if (e.touches.length === 2 && isPinching && selectedImageIndex !== -1) {
-        // 双指缩放
-        if (!canvasRef.current) return;
-        const canvas = canvasRef.current;
+        // 双指缩放 - 修复iOS上的问题
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
         const image = images[selectedImageIndex];
         const GRID_SIZE = 32;
 
@@ -716,54 +719,61 @@ export default function App() {
         const touch2 = e.touches[1];
         const distance = Math.hypot(
           touch2.clientX - touch1.clientX,
-          touch2.clientY - touch1.clientY
+          touch2.clientY - touch2.clientY
         );
 
-        // 计算缩放比例
-        const scaleFactor = distance / lastPinchDistance;
-        let newScale = initialScale * scaleFactor;
+        // 仅当有明显变化时才处理，避免抖动
+        if (Math.abs(distance - lastPinchDistance) > 5) {
+          // 计算缩放比例
+          const scaleFactor = distance / lastPinchDistance;
+          let newScale = initialScale * scaleFactor;
 
-        // 限制缩放范围
-        newScale = Math.max(0.1, Math.min(newScale, 5));
+          // 限制缩放范围
+          newScale = Math.max(0.1, Math.min(newScale, 5));
 
-        // 计算新中心点
-        const centerX = (touch1.clientX + touch2.clientX) / 2;
-        const centerY = (touch1.clientY + touch2.clientY) / 2;
+          // 计算触摸中心点 - 转换为画布坐标系
+          const centerClientX = (touch1.clientX + touch2.clientX) / 2;
+          const centerClientY = (touch1.clientY + touch2.clientY) / 2;
 
-        // 计算缩放前后的尺寸差
-        const oldWidth = image.img.width * image.scale;
-        const oldHeight = image.img.height * image.scale;
-        const newWidth = image.img.width * newScale;
-        const newHeight = image.img.height * newScale;
-        const widthDiff = newWidth - oldWidth;
-        const heightDiff = newHeight - oldHeight;
+          // 转换为画布坐标系
+          const centerCanvasX = (centerClientX - rect.left) * scaleX;
+          const centerCanvasY = (centerClientY - rect.top) * scaleY;
 
-        // 更新位置，保持中心点不变
-        let newX = image.x - widthDiff / 2;
-        let newY = image.y - heightDiff / 2;
+          // 计算当前图片中心点
+          const imgCenterX = image.x + (image.img.width * image.scale) / 2;
+          const imgCenterY = image.y + (image.img.height * image.scale) / 2;
 
-        // 对齐到网格
-        newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-        newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+          // 计算缩放后的新尺寸
+          const newWidth = image.img.width * newScale;
+          const newHeight = image.img.height * newScale;
 
-        // 确保不超出画布边界
-        newX = Math.max(0, Math.min(canvas.width - newWidth, newX));
-        newY = Math.max(0, Math.min(canvas.height - newHeight, newY));
+          // 计算新的左上角位置，保持缩放中心点不变
+          let newX = imgCenterX - newWidth / 2;
+          let newY = imgCenterY - newHeight / 2;
 
-        // 更新图片
-        setImages(prevImages => {
-          const newImages = [...prevImages];
-          newImages[selectedImageIndex] = {
-            ...newImages[selectedImageIndex],
-            scale: newScale,
-            x: newX,
-            y: newY
-          };
-          return newImages;
-        });
+          // 对齐到网格
+          newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+          newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
 
-        setLastPinchDistance(distance);
-        drawCanvas();
+          // 确保不超出画布边界
+          newX = Math.max(0, Math.min(canvas.width - newWidth, newX));
+          newY = Math.max(0, Math.min(canvas.height - newHeight, newY));
+
+          // 更新图片
+          setImages(prevImages => {
+            const newImages = [...prevImages];
+            newImages[selectedImageIndex] = {
+              ...newImages[selectedImageIndex],
+              scale: newScale,
+              x: newX,
+              y: newY
+            };
+            return newImages;
+          });
+
+          setLastPinchDistance(distance);
+          drawCanvas();
+        }
       }
     }
     // 如果不是在操作画布，不阻止默认行为，允许页面滚动
@@ -771,8 +781,6 @@ export default function App() {
 
   const handleTouchEnd = (e) => {
     // 不需要在这里调用 preventDefault
-    // 因为触摸结束时我们希望恢复正常的滚动行为
-    
     if (e.touches.length === 0) {
       // 所有手指都离开了屏幕
       setIsPinching(false);
@@ -787,7 +795,7 @@ export default function App() {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-  
+
         setDragStart({
           x: (touch.clientX - rect.left) * scaleX,
           y: (touch.clientY - rect.top) * scaleY
@@ -795,31 +803,6 @@ export default function App() {
       }
     }
   };
-
-  // 修改useEffect中的事件监听绑定
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.addEventListener('mousedown', handleMouseDown);
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-
-      // 修改事件监听方式，使用正确的passive设置
-      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-      window.addEventListener('touchmove', handleTouchMove, { passive: false });
-      window.addEventListener('touchend', handleTouchEnd);
-
-      return () => {
-        canvas.removeEventListener('mousedown', handleMouseDown);
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-
-        canvas.removeEventListener('touchstart', handleTouchStart);
-        window.removeEventListener('touchmove', handleTouchMove);
-        window.removeEventListener('touchend', handleTouchEnd);
-      };
-    }
-  }, [selectedImageIndex, isDragging, dragStart, images, resizeMode, isPinching, lastPinchDistance, initialScale, initialDimensions]);
 
   // 图片缩放功能
   const handleScaleChange = (e) => {
@@ -943,6 +926,57 @@ export default function App() {
     }
   };
 
+  // 网格设置对话框组件
+  const GridSettingsDialog = () => {
+    if (!showGridSettings) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
+        <div className="bg-white rounded-lg p-6 w-11/12 max-w-md">
+          <h3 className="text-xl font-bold mb-4">网格设置</h3>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                网格颜色
+              </label>
+              <input
+                type="color"
+                value={gridColor}
+                onChange={handleColorChange}
+                className="w-full h-10"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                透明度 ({(gridOpacity * 100).toFixed(0)}%)
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={gridOpacity}
+                onChange={handleOpacityChange}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-2">
+            <button
+              onClick={() => setShowGridSettings(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // 当组件挂载时，设置事件监听器
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -978,186 +1012,173 @@ export default function App() {
         <div className="bg-white shadow-lg p-6">
           <h1 className="text-2xl font-bold mb-6 text-center">图片网格工具</h1>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* 左侧：工具控制面板 */}
-            <div className="lg:col-span-1 space-y-4">
-              <button
-                onClick={() => fileInputRef.current.click()}
-                className="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
-              >
-                选择图片
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                multiple
-                className="hidden"
-              />
+          {/* 工具栏 */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            <button
+              onClick={() => fileInputRef.current.click()}
+              className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+            >
+              选择图片
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              multiple
+              className="hidden"
+            />
 
-              {/* 图片控制 */}
+            <button
+              onClick={() => setShowGridSettings(true)}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+            >
+              网格设置
+            </button>
+
+            <button
+              onClick={downloadImage}
+              className="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600"
+            >
+              下载图片
+            </button>
+          </div>
+
+          {/* 画布区域 */}
+          <div
+            ref={canvasContainerRef}
+            className="overflow-hidden bg-gray-50 flex justify-center relative border rounded-md mb-4"
+          >
+            <canvas
+              ref={canvasRef}
+              className="max-w-full h-auto cursor-move"
+              style={{
+                aspectRatio: '1051/1500',
+                maxHeight: '70vh',
+                objectFit: 'contain'
+              }}
+            />
+            {selectedImageIndex !== -1 && (
+              <div className="absolute top-2 left-2 bg-white bg-opacity-80 rounded px-2 py-1 text-sm">
+                已选择: {images[selectedImageIndex]?.name || `图片 ${selectedImageIndex + 1}`}
+              </div>
+            )}
+            {images.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <p>点击"选择图片"按钮上传图片</p>
+                  <p className="text-sm mt-2">支持拖拽位置和调整大小</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 图片控制区域 - 现在放在画布和图片列表之间 */}
+          <div className="mb-4">
+            <div className="border p-4 rounded-md bg-gray-50">
+              <h3 className="font-medium mb-3">图片控制:</h3>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                <button
+                  onClick={bringToFront}
+                  disabled={selectedImageIndex === -1 || selectedImageIndex === 0}
+                  className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1 && selectedImageIndex !== 0
+                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                >
+                  移至顶层
+                </button>
+
+                <button
+                  onClick={sendToBack}
+                  disabled={selectedImageIndex === -1 || selectedImageIndex === images.length - 1}
+                  className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1 && selectedImageIndex !== images.length - 1
+                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                >
+                  移至底层
+                </button>
+
+                <button
+                  onClick={generateSketch}
+                  disabled={selectedImageIndex === -1}
+                  className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1
+                      ? "bg-green-500 text-white hover:bg-green-600"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                >
+                  生成线稿副本
+                </button>
+
+                <button
+                  onClick={deleteSelectedImage}
+                  disabled={selectedImageIndex === -1}
+                  className={`px-3 py-2 rounded-md ${selectedImageIndex !== -1
+                      ? "bg-red-500 text-white hover:bg-red-600"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                >
+                  删除图片
+                </button>
+              </div>
+
               {selectedImageIndex !== -1 && (
-                <div className="space-y-4 border p-4 rounded-md">
-                  <h3 className="font-medium">图片控制:</h3>
-
-                  <div className="space-y-2">
-                    <label className="block text-sm">
-                      缩放: {images[selectedImageIndex].scale.toFixed(2)}x
-                    </label>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="3"
-                      step="0.05"
-                      value={images[selectedImageIndex].scale}
-                      onChange={handleScaleChange}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={bringToFront}
-                      className="bg-blue-500 text-white px-2 py-1 rounded-md hover:bg-blue-600"
-                    >
-                      移至顶层
-                    </button>
-                    <button
-                      onClick={sendToBack}
-                      className="bg-blue-500 text-white px-2 py-1 rounded-md hover:bg-blue-600"
-                    >
-                      移至底层
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={generateSketch}
-                    disabled={selectedImageIndex === -1}
-                    className={`w-full ${selectedImageIndex !== -1 ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 cursor-not-allowed'} text-white px-2 py-1 rounded-md mt-2`}
-                  >
-                    生成线稿副本
-                  </button>
-
-                  <button
-                    onClick={deleteSelectedImage}
-                    className="w-full bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600"
-                  >
-                    删除图片
-                  </button>
-                </div>
-              )}
-
-              {/* 网格控制 */}
-              <div className="space-y-4 border p-4 rounded-md">
-                <h3 className="font-medium">网格设置:</h3>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    网格颜色
-                  </label>
-                  <input
-                    type="color"
-                    value={gridColor}
-                    onChange={handleColorChange}
-                    className="w-full h-10"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    透明度 ({(gridOpacity * 100).toFixed(0)}%)
+                <div className="mt-3">
+                  <label className="block text-sm font-medium mb-1">
+                    缩放: {images[selectedImageIndex].scale.toFixed(2)}x
                   </label>
                   <input
                     type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={gridOpacity}
-                    onChange={handleOpacityChange}
+                    min="0.1"
+                    max="3"
+                    step="0.05"
+                    value={images[selectedImageIndex].scale}
+                    onChange={handleScaleChange}
                     className="w-full"
                   />
-                </div>
-              </div>
-
-              <button
-                onClick={downloadImage}
-                className="w-full bg-purple-500 text-white px-4 py-3 rounded-md hover:bg-purple-600"
-              >
-                下载带网格的图片
-              </button>
-
-              {/iPad|iPhone|iPod/.test(navigator.userAgent) && (
-                <p className="text-sm text-gray-600 text-center">
-                  iOS设备请在新窗口打开后，长按图片选择"存储图像"
-                </p>
-              )}
-            </div>
-
-            {/* 右侧：画布区域 */}
-            <div className="lg:col-span-2 space-y-4">
-              <div
-                ref={canvasContainerRef}
-                className="overflow-hidden bg-gray-50 flex justify-center relative border rounded-md"
-              >
-                <canvas
-                  ref={canvasRef}
-                  className="max-w-full h-auto cursor-move"
-                  style={{
-                    aspectRatio: '1051/1500',
-                    maxHeight: '70vh',
-                    objectFit: 'contain'
-                  }}
-                />
-                {selectedImageIndex !== -1 && (
-                  <div className="absolute top-2 left-2 bg-white bg-opacity-80 rounded px-2 py-1 text-sm">
-                    已选择: {images[selectedImageIndex].name || `图片 ${selectedImageIndex + 1}`}
-                  </div>
-                )}
-                {images.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                    <div className="text-center">
-                      <p>点击"选择图片"按钮上传图片</p>
-                      <p className="text-sm mt-2">支持拖拽位置和调整大小</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {images.length > 0 && (
-                <div className="border rounded-md p-4 bg-gray-50">
-                  <h3 className="font-medium mb-2">图片列表 ({images.length}张):</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {images.map((image, index) => (
-                      <div
-                        key={index}
-                        className={cn(
-                          "cursor-pointer rounded-md p-1 overflow-hidden border",
-                          selectedImageIndex === index
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 hover:bg-gray-100"
-                        )}
-                        onClick={() => setSelectedImageIndex(index)}
-                      >
-                        <div className="relative pb-[75%]">
-                          <img
-                            src={image.img.src}
-                            alt={`图片 ${index + 1}`}
-                            className="absolute inset-0 w-full h-full object-contain"
-                          />
-                        </div>
-                        <div className="mt-1 truncate text-xs text-center">
-                          {image.name || `图片 ${index + 1}`}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>
           </div>
+
+          {/* 图片列表 */}
+          {images.length > 0 && (
+            <div className="border rounded-md p-4 bg-gray-50">
+              <h3 className="font-medium mb-2">图片列表 ({images.length}张):</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                {images.map((image, index) => (
+                  <div
+                    key={index}
+                    className={cn(
+                      "cursor-pointer rounded-md p-1 overflow-hidden border",
+                      selectedImageIndex === index
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:bg-gray-100"
+                    )}
+                    onClick={() => setSelectedImageIndex(index)}
+                  >
+                    <div className="relative pb-[75%]">
+                      <img
+                        src={image.img.src}
+                        alt={`图片 ${index + 1}`}
+                        className="absolute inset-0 w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="mt-1 truncate text-xs text-center">
+                      {image.name || `图片 ${index + 1}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* 网格设置对话框 */}
+      <GridSettingsDialog />
     </div>
   );
 }
