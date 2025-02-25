@@ -280,25 +280,50 @@ export default function App() {
   };
 
   // 将网格绘制提取为独立函数
+  // Updated drawGrid function to add a second larger grid
   const drawGrid = (ctx, width, height, color, opacity) => {
     const rgba = hexToRgba(color, opacity);
+
+    // Draw the standard 32x32 grid
     ctx.strokeStyle = rgba;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
 
-    // 使用固定大小的网格 (32x32) - 注意：如果修改这个值，也需要修改handleMouseMove中的GRID_SIZE
-    const GRID_SIZE = 32;
+    // Small grid size
+    const SMALL_GRID_SIZE = 32;
 
-    // 从0开始绘制网格，确保左上角也有网格线
-    // 绘制垂直线
-    for (let x = 0; x <= width; x += GRID_SIZE) {
+    // Draw small grid (32x32)
+    for (let x = 0; x <= width; x += SMALL_GRID_SIZE) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
     }
 
-    // 绘制水平线
-    for (let y = 0; y <= height; y += GRID_SIZE) {
+    for (let y = 0; y <= height; y += SMALL_GRID_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    // Draw the larger 128x196 grid with thicker lines
+    ctx.strokeStyle = rgba;
+    ctx.lineWidth = 2;
+
+    // Large grid sizes
+    const LARGE_GRID_WIDTH = 128;
+    const LARGE_GRID_HEIGHT = 192;
+
+    // Draw large grid vertical lines
+    for (let x = 0; x <= width; x += LARGE_GRID_WIDTH) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+
+    // Draw large grid horizontal lines
+    for (let y = 0; y <= height; y += LARGE_GRID_HEIGHT) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
