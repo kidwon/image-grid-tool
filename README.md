@@ -33,7 +33,7 @@ A web application for artists and designers to work with reference images using 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/image-grid-tool.git
+git clone https://github.com/kidwon/image-grid-tool.git
 
 # Navigate to the project directory
 cd image-grid-tool
